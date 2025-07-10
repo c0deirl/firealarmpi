@@ -2,7 +2,7 @@
 Fire Alarm Notification Integration with a Pi
 
 ## Development
-This is the development version, Just makig changes, and seeing what works!
+This is the development version, probably needs more work.
 
 ## Summary of Changes
 Event handler assignments are set once, not inside the loop.  
