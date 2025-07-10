@@ -12,3 +12,19 @@ All log writing functions now require the file handle (lf) as a parameter to avo
 Added a small sleep in the main loop to avoid busy waiting.  
 Directory for logs is ensured to exist.  
 More robust cleanup on exit.  
+
+## Run as a Service  
+Create a "firealarm.service" file. Place that in /etc/systemd/system/firealarm.service  
+Should look like below:  
+
+```
+[Unit]  
+Description=Fire Alarm Pi
+
+[Service]
+ExecStart=/usr/bin/firealarm --tap tap0 --mode 0660 \
+--dirmode 0750
+
+[Install]
+wantdeBy=multi-user.target
+```
