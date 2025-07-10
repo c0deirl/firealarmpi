@@ -22,6 +22,9 @@ Should look like below:
 ```
 [Unit]  
 Description=Fire Alarm Pi
+After=network.target
+After=systemd-user-sessions.service
+After=network-online.target
 
 [Service]
 ExecStart=/path/to/button.py
