@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+# D. Greathouse
+# St Paul Lutheran Church
 from gpiozero import Button
 import os
 import time
