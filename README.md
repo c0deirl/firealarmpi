@@ -4,7 +4,7 @@ Fire Alarm Notification Integration with a Pi
 ## Development
 This is the development version, Just makig changes, and seeing what works!
 
-##Summary of Changes
+## Summary of Changes
 Event handler assignments are set once, not inside the loop.  
 Log file is always closed before opening a new one.  
 Used context-specific exception handling for clean shutdown.  
