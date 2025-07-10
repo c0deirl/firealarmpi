@@ -14,7 +14,9 @@ Directory for logs is ensured to exist.
 More robust cleanup on exit.  
 
 ## Run as a Service  
-Create a "firealarm.service" file. Place that in /etc/systemd/system/firealarm.service  
+Create a "firealarm.service" file. Place that in /etc/systemd/system/  
+Make sure the script is executible  
+
 Should look like below:  
 
 ```
@@ -22,9 +24,25 @@ Should look like below:
 Description=Fire Alarm Pi
 
 [Service]
-ExecStart=/usr/bin/firealarm --tap tap0 --mode 0660 \
---dirmode 0750
+ExecStart=/path/to/button.py
+Restart=on-failure
 
 [Install]
 wantdeBy=multi-user.target
+```
+You can then start it with:  
+```
+sudo systemctl start firealarm  
+```
+To enable it to run at boot:  
+```
+sudo systemctl enable firealarm
+```
+To stop the service:  
+```
+sudo systemctl stop firealarm
+```
+To remove the service completely:
+```
+sudo systemctl disable firealarm
 ```
