@@ -27,7 +27,7 @@ After=systemd-user-sessions.service
 After=network-online.target
 
 [Service]
-ExecStart=/path/to/button.py
+ExecStart=/usr/bin/python3 /path/to/button.py
 Restart=on-failure
 
 [Install]
