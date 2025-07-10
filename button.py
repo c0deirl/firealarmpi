@@ -14,6 +14,12 @@ import sys
 alarm = Button(4, bounce_time=1, hold_time=5)
 trouble = Button(17, bounce_time=1, hold_time=5)
 
+"""
+Notify list is now by NTFY app..  There is no distinction between 
+Trouble and Alarm and Weekly notify lists
+
+"""
+
 # Log file location
 logloc = "/home/dgreathouse/logs/"
 os.makedirs(logloc, exist_ok=True)
