@@ -1,0 +1,113 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include "SPIFFS.h"
+#include <WebServer.h>
+
+#define ALARM_PIN 4
+#define TROUBLE_PIN 17
+
+const char* ssid = "StPaul";
+const char* password = "Luther500";
+
+const char* ntfy_topic_url = "https://notify.codemov.com/fire";
+
+WebServer server(80);
+
+String logFilePath = "/log.txt";
+
+// Helper: Write log entry
+void writeLog(const String &msg) {
+  File logFile = SPIFFS.open(logFilePath, FILE_APPEND);
+  if (logFile) {
+    logFile.println(msg);
+    logFile.close();
+  }
+}
+
+// Helper: Send NTFY notification
+void sendNotification(const String &body) {
+  HTTPClient http;
+  http.begin(ntfy_topic_url);
+  http.addHeader("Content-Type", "text/plain");
+  int httpResponseCode = http.POST(body);
+  http.end();
+  writeLog("Notification sent: " + body + " (Code: " + String(httpResponseCode) + ")");
+}
+
+// Web handler: Serve logs
+void handleRoot() {
+  File logFile = SPIFFS.open(logFilePath, FILE_READ);
+  String html = "<html><body><h2>ESP32 Fire Alarm Logs</h2><pre>";
+  if (logFile) {
+    while (logFile.available()) {
+      html += logFile.readStringUntil('\n') + "\n";
+    }
+    logFile.close();
+  } else {
+    html += "No log file found.";
+  }
+  html += "</pre></body></html>";
+  server.send(200, "text/html", html);
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(ALARM_PIN, INPUT_PULLDOWN);
+  pinMode(TROUBLE_PIN, INPUT_PULLDOWN);
+
+  // SPIFFS init
+  if(!SPIFFS.begin(true)) {
+    Serial.println("SPIFFS Mount Failed");
+    return;
+  }
+
+  // WiFi connect
+  WiFi.begin(ssid, password);
+  Serial.print("Connecting to WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.print(".");
+    delay(500);
+  }
+  Serial.println("\nWiFi connected: " + WiFi.localIP().toString());
+  writeLog("WiFi connected: " + WiFi.localIP().toString());
+
+  // Web server
+  server.on("/", handleRoot);
+  server.begin();
+  writeLog("Web server started.");
+
+  writeLog("Monitoring started.");
+}
+
+void loop() {
+  static bool alarmAlerted = false;
+  static bool troubleAlerted = false;
+
+  // Poll alarm pin
+  if (digitalRead(ALARM_PIN) == HIGH && !alarmAlerted) {
+    alarmAlerted = true;
+    writeLog("Fire Alarm Detected!");
+    sendNotification("Fire Alarm Activated!");
+  } else if (digitalRead(ALARM_PIN) == LOW && alarmAlerted) {
+    alarmAlerted = false;
+    writeLog("Fire Alarm Cleared!");
+    sendNotification("Fire Alarm Cleared!");
+  }
+
+  // Poll trouble pin
+  if (digitalRead(TROUBLE_PIN) == HIGH && !troubleAlerted) {
+    troubleAlerted = true;
+    writeLog("Trouble Alarm Detected!");
+    sendNotification("Trouble Alarm Activated!");
+  } else if (digitalRead(TROUBLE_PIN) == LOW && troubleAlerted) {
+    troubleAlerted = false;
+    writeLog("Trouble Alarm Cleared!");
+    sendNotification("Trouble Alarm Cleared!");
+  }
+
+  // Web server loop
+  server.handleClient();
+
+  delay(200); // Polling interval
+}
