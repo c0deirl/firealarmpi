@@ -27,8 +27,8 @@ Fire Alarm Notification Integration with a ESP32
 - NTFY Notifications when the GPIO pins are triggered.  
 - WiFi Failure Logging: Logs if the ESP32 cannot connect to WiFi.
 #### TO DO
-  [] Email Notifications  
-  [] Relay Outputs  
+  [ ] Email Notifications  
+  [ ] Relay Outputs  
 
 ## Webpage:
 - Live GPIO Status Indicators (Red = active HIGH, Green = inactive LOW) for alarm and trouble pins.  
