@@ -2,12 +2,14 @@
 Fire Alarm Notification Integration with a ESP32
 
 ## Setup Instructions
-Replace YOUR_WIFI_SSID, YOUR_WIFI_PASSWORD, and YOUR_TOPIC with your settings.
+- Replace YOUR_WIFI_SSID, YOUR_WIFI_PASSWORD, and YOUR_TOPIC with your settings.
+
 In Arduino IDE, install libraries:
-ESP32 board support
-SPIFFS
-WebServer
-Connect alarm/trouble buttons/switches to GPIO 4 and 17 (or modify pins).
+- ESP32 board support
+- SPIFFS
+- WebServer
+
+Connect alarm/trouble buttons/switches to GPIO 4 and 17 (or modify pins).  
 Upload code and access logs via http://<ESP32_IP>/ from your browser.
 
 ## Features Covered
