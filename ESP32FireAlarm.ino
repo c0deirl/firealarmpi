@@ -8,8 +8,8 @@
 #define ALARM_PIN 4
 #define TROUBLE_PIN 17
 
-const char* ssid = "stpaul";
-const char* password = "luther500";
+const char* ssid = "N8MDG";
+const char* password = "mattg123";
 const char* ntfy_topic_url = "https://notify.codemov.com/testfire";
 
 // FTP credentials
@@ -32,10 +32,12 @@ String currentLogDate = "";
 
 unsigned long lastFTPTime = 0;
 const unsigned long ftpInterval = 3600000; // 1 hour in ms
+const unsigned long ftpIntervalday = 86400000; // 1 day in ms
 volatile bool ftpManualRequested = false;
 
 void waitForNTPSync() {
-  configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+  // The First Value should be -14400 for EST
+  configTime(-14400, 0, "pool.ntp.org", "time.nist.gov");
   Serial.print("Waiting for NTP time sync");
   int maxTries = 40;
   int tries = 0;
@@ -227,9 +229,11 @@ void handleRoot() {
             </div>
           </div>
           <div class="logbox" id="logbox">Loading logs...</div>
+          <div class="status">
           <button class="ftpbtn" onclick="ftpBackup()" id="ftpBackupBtn">Backup Log to FTP</button>
+          <button class="ftpbtn" style="background:#e22;margin-left:8px;" onclick="deleteLogFile()" id="deleteLogBtn">Delete Log File</button>
           <span id="ftpStatus"></span>
-        </div>
+        </div> </div>
         <script>
           function setWifiBars(rssi) {
             let bars = 0;
@@ -276,6 +280,19 @@ void handleRoot() {
               })
               .catch(e => {
                 document.getElementById('ftpStatus').textContent = "FTP upload error";
+              });
+          }
+          function deleteLogFile() {
+            if (!confirm("Are you sure you want to DELETE the current log file?")) return;
+            document.getElementById('ftpStatus').textContent = "Deleting log file...";
+            fetch('/deletelog')
+              .then(r => r.json())
+              .then(j => {
+                document.getElementById('ftpStatus').textContent = j.status;
+                updateLogs();
+              })
+              .catch(e => {
+                document.getElementById('ftpStatus').textContent = "Log file deletion error";
               });
           }
           setInterval(updateStatus, 1000);
@@ -350,8 +367,34 @@ void handleFTPBackup() {
   bool ok = uploadLogToFTP(logFilePath, remoteName, ftpResult);
   String json = "{\"status\":\"" + ftpResult + "\"}";
   server.send(200, "application/json", json);
-}
+ // SPIFFS.remove(logFilePath);
+  writeLog(getCurrentTimeStr() + " Log file FTP backup successful.");
+ // bool backupSuccess = uploadLogToFTP(logFilePath, remoteName, ftpResult);
+ //   if (backupSuccess) {
+ //     // Delete the log file after successful backup
+ //     if (SPIFFS.exists(logFilePath)) {
+ //       SPIFFS.remove(logFilePath);
+ //       writeLog(getCurrentTimeStr() + " Log file deleted after FTP backup.");
+ //       }
+ //   } 
+  }
 
+ void handleDeleteLog() {
+  updateLogFilePath();
+  bool ok = false;
+  if (SPIFFS.exists(logFilePath)) {
+    ok = SPIFFS.remove(logFilePath);
+  }
+  String status;
+  if (ok) {
+    status = "Log file deleted: " + logFilePath;
+    writeLog(getCurrentTimeStr() + " Log file deleted by user.");
+  } else {
+    status = "Log file not found or could not be deleted.";
+  }
+  String json = "{\"status\":\"" + status + "\"}";
+  server.send(200, "application/json", json);
+}
 void setup() {
   Serial.begin(115200);
 
@@ -394,6 +437,7 @@ void setup() {
   server.on("/status", handleStatus);
   server.on("/logs", handleLogs);
   server.on("/ftpbackup", HTTP_GET, handleFTPBackup); // Add manual backup endpoint
+  server.on("/deletelog", HTTP_GET, handleDeleteLog); // Manual log file removal
   server.begin();
   writeLog(getCurrentTimeStr() + " Web server started.");
 
@@ -442,21 +486,21 @@ void loop() {
     uploadLogToFTP(logFilePath, remoteName, ftpResult);
   }
 
-  // Every hour: upload current day's log file to FTP and delete if memory becomes an issue
+  // upload current day's log file to FTP and delete if memory becomes an issue
   // Remove above if statement and replace with this one to rotate the internal logs. Also change ftpIntreval to 86400000, one day in ms
-//  if (millis() - lastFTPTime > ftpInterval) {
-//    lastFTPTime = millis();
-//    String remoteName = currentLogDate + ".log";
-//    String ftpResult;
-//    bool backupSuccess = uploadLogToFTP(logFilePath, remoteName, ftpResult);
-//    if (backupSuccess) {
-//      // Delete the log file after successful backup
-//      if (SPIFFS.exists(logFilePath)) {
-//        SPIFFS.remove(logFilePath);
-//        writeLog(getCurrentTimeStr() + " Log file deleted after FTP backup.");
-//      }
-//   }
-//  }
+  if (millis() - lastFTPTime > ftpIntervalday) {
+    lastFTPTime = millis();
+    String remoteName = currentLogDate + "_daily.log";
+    String ftpResult;
+    bool backupSuccess = uploadLogToFTP(logFilePath, remoteName, ftpResult);
+    if (backupSuccess) {
+      // Delete the log file after successful backup
+      if (SPIFFS.exists(logFilePath)) {
+        SPIFFS.remove(logFilePath);
+        writeLog(getCurrentTimeStr() + " Log file deleted after FTP backup.");
+      }
+   }
+  }
 
-  delay(150);
+  delay(250);
 }
