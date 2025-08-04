@@ -2,7 +2,7 @@
 Fire Alarm Notification Integration with a ESP32
 
 ## Setup Instructions
-- Replace YOUR_WIFI_SSID, YOUR_WIFI_PASSWORD, and YOUR_TOPIC with your settings.
+- Replace SSID, Wifi Password , and NTFY Topic with your settings.
 
 - In Arduino IDE, install libraries:
   - ESP32 board support
@@ -11,9 +11,9 @@ Fire Alarm Notification Integration with a ESP32
 
 - Connect alarm input to GPIO 4  
 - Connect Trouble Input to GPIO 17    
-- Access logs via http://<ESP32_IP>/ from your browser
-- Logs are backed up to an FTP server every hour
-- Logs are backed up remotely and deleted from the ESP32 daily
+- Access logs via http://<ESP32_IP>/ from your browser  
+- Logs are backed up to an FTP server every hour  
+- Logs are backed up remotely and deleted from the ESP32 daily  
 
 ## Features Covered
 - WiFi connection.
