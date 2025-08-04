@@ -11,7 +11,9 @@ Fire Alarm Notification Integration with a ESP32
 
 - Connect alarm input to GPIO 4  
 - Connect Trouble Input to GPIO 17    
-- Access logs via http://<ESP32_IP>/ from your browser.
+- Access logs via http://<ESP32_IP>/ from your browser
+- Logs are backed up to an FTP server every hour
+- Logs are backed up remotely and deleted from the ESP32 daily
 
 ## Features Covered
 - WiFi connection.
