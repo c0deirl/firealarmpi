@@ -4,9 +4,17 @@
 #include <WebServer.h>
 #include <time.h>
 #include <ESP32_FTPClient.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
 
 #define ALARM_PIN 4
 #define TROUBLE_PIN 17
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET    -1
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 const char* ssid = "N8MDG";
 const char* password = "mattg123";
@@ -397,7 +405,13 @@ void handleFTPBackup() {
 }
 void setup() {
   Serial.begin(115200);
-
+  // Initialize SSD1306 display
+  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println(F("SSD1306 allocation failed"));
+    for(;;);
+    }
+  display.clearDisplay();
+  display.display();
   pinMode(ALARM_PIN, INPUT_PULLDOWN);
   pinMode(TROUBLE_PIN, INPUT_PULLDOWN);
 
@@ -451,6 +465,50 @@ void setup() {
 void loop() {
   static bool alarmAlerted = false;
   static bool troubleAlerted = false;
+
+ // Read GPIOs
+  bool alarmActive = digitalRead(ALARM_PIN) == HIGH;
+  bool troubleActive = digitalRead(TROUBLE_PIN) == HIGH;
+
+  // WiFi info
+  int32_t rssi = WiFi.RSSI();
+  String ip = WiFi.localIP().toString();
+
+  // WiFi Reconnection
+    while (WiFi.status() != WL_CONNECTED) {
+      delay(500);
+      Serial.print(F("Connecting..."));
+      WiFi.begin(ssid, password);
+      writeLog(getCurrentTimeStr() + " WiFi Re-connected!");
+      sendNotification(getCurrentTimeStr() + " WiFi Re-connected!");
+      }
+
+  // Display output
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+
+  display.setCursor(0,0);
+  display.println("FireAlarm Status");
+
+  display.setCursor(0,16);
+  display.print("ALARM: ");
+  display.println(alarmActive ? "ACTIVE" : "INACTIVE");
+
+  display.setCursor(0,28);
+  display.print("TROUBLE: ");
+  display.println(troubleActive ? "ACTIVE" : "INACTIVE");
+
+  display.setCursor(0,40);
+  display.print("WiFi: ");
+  display.print(rssi);
+  display.println(" dBm");
+
+  display.setCursor(0,52);
+  display.print("IP: ");
+  display.println(ip);
+
+  display.display();
 
   updateLogFilePath();
 
