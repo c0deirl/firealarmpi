@@ -1,4 +1,5 @@
 #include <WiFi.h>
+#include <Arduino.h>
 #include <HTTPClient.h>
 #include "SPIFFS.h"
 #include <WebServer.h>
@@ -7,6 +8,15 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <WiFiClientSecure.h>
+
+
+
+// Email Includes
+#define ENABLE_SMTP
+#define ENABLE_DEBUG
+#define READYMAIL_DEBUG_PORT Serial
+#include <ReadyMail.h>
 
 #define ALARM_PIN 4
 #define TROUBLE_PIN 17
@@ -16,6 +26,18 @@
 #define OLED_RESET    -1
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
+//SMTP Server Settings for Gmail - Change it if you are using other email servers
+#define SMTP_HOST "smtp.gmail.com"
+#define SMTP_PORT 465
+#define AUTHOR_EMAIL "greathouse.matthew@gmail.com" //Put your Sender email id
+#define AUTHOR_PASSWORD "***********"  // App password not gmail password - this is for 2FA enabled gmail email id.
+#define RECIPIENT_EMAIL "*************" //Receiver email id
+
+//Email Setup
+WiFiClientSecure client;
+SMTPClient smtp(client);
+
+// WiFi Credentials and NTFY Topic
 const char* ssid = "N8MDG";
 const char* password = "mattg123";
 const char* ntfy_topic_url = "https://notify.codemov.com/testfire";
@@ -24,7 +46,7 @@ const char* ntfy_topic_url = "https://notify.codemov.com/testfire";
 char ftp_server[] = "132.145.171.18";
 uint16_t ftp_port = 2121;
 char ftp_user[]   = "stpaul";
-char ftp_pass[]   = "Cegt5mj!";
+char ftp_pass[]   = "**********";
 char ftp_path[]   = "/logs/";
 uint16_t ftp_timeout = 5000;
 uint8_t ftp_debug = 2;
@@ -39,9 +61,52 @@ String logFilePath = "";
 String currentLogDate = "";
 
 unsigned long lastFTPTime = 0;
-const unsigned long ftpInterval = 3600000; // 1 hour in ms
+const unsigned long ftpInterval = 43200000; // 12 hours in ms
 const unsigned long ftpIntervalday = 86400000; // 1 day in ms
 volatile bool ftpManualRequested = false;
+
+//Email SMTP Status Check
+void smtpStatus(SMTPStatus status) {
+  Serial.println(status.text);
+}
+
+
+void sendemail(String emailbody) {
+
+   client.setInsecure();  // Insecure, for dev testing
+  configTime(-14400, 0, "pool.ntp.org", "time.nist.gov");
+  Serial.print("Waiting for NTP time...");
+  while (time(nullptr) < 100000) {
+    delay(1000);
+    Serial.print(".");
+  }
+  Serial.println();
+  smtp.connect(SMTP_HOST, SMTP_PORT, smtpStatus, true);
+  if (!smtp.isConnected()) return;
+
+  smtp.authenticate(AUTHOR_EMAIL, AUTHOR_PASSWORD, readymail_auth_password);
+  if (!smtp.isAuthenticated()) return;
+
+  SMTPMessage msg;
+  msg.headers.add(rfc822_from, AUTHOR_EMAIL);
+  msg.headers.add(rfc822_to, RECIPIENT_EMAIL);
+  msg.headers.add(rfc822_subject, " St Paul Fire Alarm System");
+  msg.headers.addCustom("X-Priority", "1");
+  msg.headers.addCustom("Importance", "High");
+
+  String body = emailbody;
+ // String body = " --- ALERT ---,\r\n\r\n";
+ // body += "The ST Paul Fire Alarm System has detected a change\r\n";
+ // body += emailbody + " -- -- .\r\n\r\n";
+  msg.html.body(body);
+
+  msg.timestamp = time(nullptr);
+
+  smtp.send(msg, "SUCCESS,FAILURE");
+  writeLog(getCurrentTimeStr() + " Email Notification Sent");
+  // smtp.disconnect(); // REMOVE or comment this out
+}
+
 
 void waitForNTPSync() {
   // The First Value should be -14400 for EST
@@ -98,6 +163,7 @@ void sendNotification(const String &body) {
   HTTPClient http;
   http.begin(ntfy_topic_url);
   http.addHeader("Content-Type", "text/plain");
+  http.addHeader("X-Actions", "view, Fire Alarm System, https://fire.stpaulwv.org");
   int httpResponseCode = http.POST(body);
   http.end();
   writeLog("Notification sent: " + body + " (Code: " + String(httpResponseCode) + ")");
@@ -363,6 +429,76 @@ bool uploadLogToFTP(String localPath, String remotePath, String& response) {
   response = "FTP upload successful: " + remotePath;
   Serial.println(response);
   writeLog(getCurrentTimeStr() + " " + response);
+  sendNotification(getCurrentTimeStr() + " Log Backup to FTP Complete.");
+  String uploademail = R"rawliteral(
+    <html lang="en">
+    <head>
+	
+<style>
+.button {
+  display: block;
+  align: center;
+  border: none;
+  color: white;
+  text-align: center;
+  text-decoration: none;
+  font-size: 16px;
+  width: 100%;
+  height: 50px;
+  cursor: pointer;
+  font-family: Arial;
+  font-size: 25px;
+  padding-top: 20px;
+  padding-bottom: 5px;
+  border-radius: 10px;
+}
+.title  {
+    display: inline-block;
+	background: white;
+	font-family: Arial;
+	font-weight: Bold;
+	font-size: 30px;
+    width: 100%;
+	padding-top: 100px;
+	padding-bottom: 100px;
+	border-radius: 10px;
+	text-align: center;
+	vertical-align: middle;
+}
+body   {
+	background-color:grey;
+	}
+.h1    {
+font-family: Arial;
+color: red;
+text-align: center;
+background-color: black; 
+padding-top: 15px;
+padding-bottom: 15px; 
+border-radius: 8px;
+}
+
+.button1 {background-color: #04AA6D;} /* Green */
+.button2 {background-color: #008CBA;} /* Blue */
+</style>
+
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>StPaul Fire System</title>
+    </head>
+    <body class=body>
+        <h1 class=h1>St Paul Fire System</h1>
+        <p style="font-family: Arial; font-size: 24px; text-align: center;">Fire Alarm System Notification</p>
+        <div class=title>
+            <span style="font-weight: bold; color: green;"> FTP Upload was Successful </span>
+        <br> </div> <br> <br>
+		<div style="text-align: center;">Contact Matt G for information on how to retrieve the archived logs<br><br>
+		<a href="https://fire.stpaulwv.org" class="button button1">System Status Page</a>
+		</div>
+    </body>
+    </html>
+  )rawliteral";
+  sendemail(uploademail);
   return true;
 }
 
@@ -389,7 +525,11 @@ void handleFTPBackup() {
 
  void handleDeleteLog() {
   updateLogFilePath();
-  bool ok = false;
+  String remoteName = currentLogDate + "_backup.log";
+  String ftpResult;
+  bool ok = uploadLogToFTP(logFilePath, remoteName, ftpResult);
+  writeLog(getCurrentTimeStr() + " Log file FTP backup successful.");
+  remoteName = currentLogDate + ".log";
   if (SPIFFS.exists(logFilePath)) {
     ok = SPIFFS.remove(logFilePath);
   }
@@ -423,6 +563,7 @@ void setup() {
   updateLogFilePath();
   writeLog("ESP32 booting...");
 
+//WiFi Connection
   WiFi.begin(ssid, password);
   Serial.print("Connecting to WiFi");
   int wifiTries = 0;
@@ -512,15 +653,189 @@ void loop() {
 
   updateLogFilePath();
 
-  // Poll alarm pin
+//email HTML Templates
+String alarmemail = R"rawliteral(
+      <html lang="en">
+    <head>
+	
+<style>
+.button {
+  display: block;
+  align: center;
+  border: none;
+  color: white;
+  text-align: center;
+  text-decoration: none;
+  font-size: 16px;
+  width: 100%;
+  height: 50px;
+  cursor: pointer;
+  font-family: Arial;
+  font-size: 25px;
+  padding-top: 20px;
+  padding-bottom: 5px;
+  border-radius: 10px;
+}
+.title  {
+    display: block;
+	background: white;
+	font-family: Arial;
+	font-weight: Bold;
+	font-size: 30px;
+    width: 100%;
+	padding-top: 100px;
+	padding-bottom: 100px;
+	border-radius: 10px;
+	text-align: center;
+	vertical-align: middle;
+}
+
+.button1 {background-color: #04AA6D;} /* Green */
+.button2 {background-color: #008CBA;} /* Blue */
+</style>
+
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>StPaul Fire System</title>
+    </head>
+    <body style="background-color:grey;">
+        <h1 style="font-family: Arial; color: red; text-align: center; background-color: black; padding: 15px; border-radius: 8px;">St Paul Fire System</h1>
+        <p style="font-family: Arial; font-size: 24px; text-align: center;">Fire Alarm System Notification</p>
+        <div class=title>
+            <span style="font-weight: bold; color: red;"> -- ACTIVE FIRE ALARM -- </span><br> 3500 Broad St. <br> Parkersburg wv, 26104 <br> 304-428-5826<br>
+        <br> </div>
+		<div style="text-align: center;"><br><br>
+		<a href="https://fire.stpaulwv.org" class="button button1">System Status Page</a>
+		</div>
+    </body>
+    </html>
+      )rawliteral";
+
+String clearedemail = R"rawliteral(
+      <html lang="en">
+    <head>
+	
+<style>
+.button {
+  display: block;
+  align: center;
+  border: none;
+  color: white;
+  text-align: center;
+  text-decoration: none;
+  font-size: 16px;
+  width: 100%;
+  height: 50px;
+  cursor: pointer;
+  font-family: Arial;
+  font-size: 25px;
+  padding-top: 20px;
+  padding-bottom: 5px;
+  border-radius: 10px;
+}
+.title  {
+    display: block;
+	background: white;
+	font-family: Arial;
+	font-weight: Bold;
+	font-size: 30px;
+    width: 100%;
+	padding-top: 100px;
+	padding-bottom: 100px;
+	border-radius: 10px;
+	text-align: center;
+	vertical-align: middle;
+}
+
+.button1 {background-color: #04AA6D;} /* Green */
+.button2 {background-color: #008CBA;} /* Blue */
+</style>
+
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>StPaul Fire System</title>
+    </head>
+    <body style="background-color:grey;">
+        <h1 style="font-family: Arial; color: red; text-align: center; background-color: black; padding: 15px; border-radius: 8px;">St Paul Fire System</h1>
+        <p style="font-family: Arial; font-size: 24px; text-align: center;">Fire Alarm System Notification</p>
+        <div class=title>
+            <span style="font-weight: bold; color: green;"> -- Alarms have cleared --</span>
+        <br> </div>
+		<div style="text-align: center;"><br><br>
+		<a href="https://fire.stpaulwv.org" class="button button1">System Status Page</a>
+		</div>
+    </body>
+    </html>
+      )rawliteral";
+
+String troubleemail = R"rawliteral(
+      <html lang="en">
+    <head>
+	
+<style>
+.button {
+  display: block;
+  align: center;
+  border: none;
+  color: white;
+  text-align: center;
+  text-decoration: none;
+  font-size: 16px;
+  width: 100%;
+  height: 50px;
+  cursor: pointer;
+  font-family: Arial;
+  font-size: 25px;
+  padding-top: 20px;
+  padding-bottom: 5px;
+  border-radius: 10px;
+}
+.title  {
+    display: block;
+	background: white;
+	font-family: Arial;
+	font-weight: Bold;
+	font-size: 30px;
+    width: 100%;
+	padding-top: 100px;
+	padding-bottom: 100px;
+	border-radius: 10px;
+	text-align: center;
+	vertical-align: middle;
+}
+
+.button1 {background-color: #04AA6D;} /* Green */
+.button2 {background-color: #008CBA;} /* Blue */
+</style>
+
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>StPaul Fire System</title>
+    </head>
+    <body style="background-color:grey;">
+        <h1 style="font-family: Arial; color: red; text-align: center; background-color: black; padding: 15px; border-radius: 8px;">St Paul Fire System</h1>
+        <p style="font-family: Arial; font-size: 24px; text-align: center;">Fire Alarm System Notification</p>
+        <div class=title>
+            <span style="font-weight: bold; color: yellow;"> SYSTEM TROUBLE <br></span> The fire alarm system is not active, please inspect the system console to determine the issue.
+        <br> </div>
+		<div style="text-align: center;"><br><br>
+		<a href="https://fire.stpaulwv.org" class="button button1">System Status Page</a>
+		</div>
+    </body>
+    </html>
+      )rawliteral";
+
+  // Poll alarm pins
   if (digitalRead(ALARM_PIN) == HIGH && !alarmAlerted) {
     alarmAlerted = true;
     writeLog(getCurrentTimeStr() + " Fire Alarm Detected!");
     sendNotification(getCurrentTimeStr() + " Fire Alarm Activated!");
+    sendemail(alarmemail);
   } else if (digitalRead(ALARM_PIN) == LOW && alarmAlerted) {
     alarmAlerted = false;
     writeLog(getCurrentTimeStr() + " Fire Alarm Cleared!");
     sendNotification(getCurrentTimeStr() + " Fire Alarm Cleared!");
+    sendemail(clearedemail);
   }
 
   // Poll trouble pin
@@ -528,10 +843,12 @@ void loop() {
     troubleAlerted = true;
     writeLog(getCurrentTimeStr() + " Trouble Alarm Detected!");
     sendNotification(getCurrentTimeStr() + " Trouble Alarm Activated!");
+    sendemail(troubleemail);
   } else if (digitalRead(TROUBLE_PIN) == LOW && troubleAlerted) {
     troubleAlerted = false;
     writeLog(getCurrentTimeStr() + " Trouble Alarm Cleared!");
     sendNotification(getCurrentTimeStr() + " Trouble Alarm Cleared!");
+    sendemail(clearedemail);
   }
 
   server.handleClient();
