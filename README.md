@@ -2,7 +2,7 @@
 Fire Alarm Notification Integration with a ESP32
 
 ## Setup Instructions
-- Replace SSID, Wifi Password , and NTFY Topic with your settings.
+- Replace SSID, Wifi Password, FTP Password, email password, and NTFY Topic with your settings.
 
 - In Arduino IDE, install libraries:
   - ESP32 board support
